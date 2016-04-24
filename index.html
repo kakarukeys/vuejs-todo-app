@@ -1,0 +1,164 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Todo App</title>
+
+        <style type="text/css">
+            button.remove {
+                margin-left: 0.5em;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div id="app"></div>
+
+        <script src="//cdnjs.cloudflare.com/ajax/libs/vue/1.0.21/vue.min.js"></script>
+        <script src="//cdnjs.cloudflare.com/ajax/libs/vue-resource/0.7.0/vue-resource.js"></script>
+
+        <!-- templates -->
+        <script type="x-template" id="template-text-input">
+            <input type="text" v-model="text" @keyup.enter="onEnter">
+        </script>
+
+        <script type="x-template" id="template-todo-item">
+            <div>
+                <span>{{ todo.description }}</span>
+                <button class="remove" @click="onRemove">X</button>
+            </div>
+        </script>
+
+        <script type="x-template" id="template-todo-list">
+            <ul>
+                <li v-for="todo in todos">
+                    <!-- no need to set track-by if modify todos in-place! -->
+                    <todo-item :todo="todo" @remove-todo="removeTodoById($index)"></todo-item>
+                </li>
+            </ul>
+        </script>
+
+        <script type="x-template" id="template-todo-app">
+            <div>
+                <text-input @add-text="addTodo"></text-input>
+                <todo-list :todos="todos" v-if="todos.length"></todo-list>
+                <p v-else>hurray no task!</p>
+            </div>
+        </script>
+
+        <script>
+            // Reducers (supposedly pure functions, but...)
+            var reducers = {
+                // name: function(todos, *args) { return todos; }
+                addTodo: function(todos, description) {
+                    todos.push({description: description});
+                    return todos;
+                },
+
+                removeTodo: function(todos, id) {
+                    todos.splice(id, 1);
+                    return todos;
+                }
+            };
+
+            // Store
+            var Store = function() {
+                var state = {todos: []};
+
+                return {
+                    getState: function() {
+                        return state;
+                    },
+
+                    // Action Creators
+                    listTodos: function(eventArgs) {
+                        Vue.http.get("todos.json").then(function(response) {
+                            state.todos = response.data.data;
+                        });
+                    },
+                    addTodo: function(eventArgs) {
+                        // simulate calling backend to add a todo
+                        Vue.http.get("todos.json").then(function() {
+                            state.todos = reducers.addTodo(state.todos, eventArgs.description);
+                        });
+                    },
+                    removeTodo: function(eventArgs) {
+                        // simulate calling backend to remove a todo
+                       Vue.http.get("todos.json").then(function() {
+                            state.todos = reducers.removeTodo(state.todos, eventArgs.id);
+                        });
+                    }
+                };
+            };
+
+            // Shared by all components
+            var store = Store();
+
+            /* Components
+             *
+             * TodoApp
+             *     - TextInput
+             *     - TodoList
+             *         - TodoItem
+             *         - TodoItem
+             *         - TodoItem
+             */
+            Vue.component("text-input", {
+                data: function() {
+                    return {text: ''};  // internal state
+                },
+
+                methods: {
+                    onEnter: function() {
+                        var inputText = this.text.trim();
+
+                        if (inputText) {
+                            this.$dispatch("add-text", inputText);  // custom event
+                            this.text = '';
+                        }
+                    }
+                },
+
+                template: "#template-text-input"
+            });
+
+            Vue.component("todo-item", {
+                props: {
+                    todo: {type: Object, required: true}
+                },
+
+                methods: {
+                    onRemove: function() {
+                        this.$dispatch("remove-todo");  // custom event
+                    }
+                },
+
+                template: "#template-todo-item"
+            });
+
+            Vue.component("todo-list", {
+                props: {
+                    todos: {type: Array, required: true}
+                },
+
+                methods: {
+                    removeTodoById: function(id) {store.removeTodo({id: id});}  // trigger an action
+                },
+
+                template: "#template-todo-list"
+            });
+
+            new Vue({
+                el: "#app",
+                data: store.getState(),
+                template: "#template-todo-app",
+
+                methods: {
+                    addTodo: function(text) {store.addTodo({description: text});}  // trigger an action
+                },
+
+                created: store.listTodos
+            });
+        </script>
+    </body>
+</html>
